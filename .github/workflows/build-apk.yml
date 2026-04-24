@@ -14,7 +14,7 @@ on:
       website_url:
         description: "Website URL to open inside the app"
         required: true
-        default: "https://yellow-breeze-3c6d.talalsalhia10.workers.dev"
+        default: "https://throbbing-sun-13b2.talalsalhia10.workers.dev"
       version_code:
         description: "Version code"
         required: true
@@ -23,6 +23,10 @@ on:
         description: "Version name"
         required: true
         default: "1.0"
+
+permissions:
+  contents: write
+  actions: read
 
 jobs:
   build:
@@ -157,7 +161,6 @@ jobs:
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
-          import android.view.View;
           import android.view.Window;
           import android.view.WindowManager;
 
@@ -201,8 +204,22 @@ jobs:
         run: |
           gradle :app:assembleDebug --no-daemon
 
-      - name: Upload APK
+      - name: Rename APK
+        run: |
+          mkdir -p output
+          cp app/build/outputs/apk/debug/app-debug.apk output/AddTalal-App-${{ github.run_number }}.apk
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: AddTalal-Generated-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: output/AddTalal-App-${{ github.run_number }}.apk
+
+      - name: Create direct APK release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: AddTalal APK Build #${{ github.run_number }}
+          files: output/AddTalal-App-${{ github.run_number }}.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
