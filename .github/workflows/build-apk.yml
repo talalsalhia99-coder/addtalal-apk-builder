@@ -6,15 +6,27 @@ on:
       app_name:
         description: "App name"
         required: true
-        default: "AddTalal Demo"
+        default: "AddTalal App"
       package_name:
         description: "Android package name"
         required: true
-        default: "com.addtalal.demo"
-      website_url:
-        description: "Website URL to open inside the app"
+        default: "com.addtalal.app"
+      build_mode:
+        description: "Build mode: url or html"
         required: true
+        default: "url"
+      website_url:
+        description: "Website URL for URL mode"
+        required: false
         default: "https://throbbing-sun-13b2.talalsalhia10.workers.dev"
+      html_base64:
+        description: "Base64 HTML code for HTML mode"
+        required: false
+        default: ""
+      icon_base64:
+        description: "Base64 app icon data URL"
+        required: false
+        default: ""
       version_code:
         description: "Version code"
         required: true
@@ -48,18 +60,25 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Create Android WebView project
+      - name: Create universal Android WebView project
+        env:
+          APP_NAME: ${{ github.event.inputs.app_name }}
+          PACKAGE_NAME: ${{ github.event.inputs.package_name }}
+          BUILD_MODE: ${{ github.event.inputs.build_mode }}
+          WEBSITE_URL: ${{ github.event.inputs.website_url }}
+          HTML_BASE64: ${{ github.event.inputs.html_base64 }}
+          ICON_BASE64: ${{ github.event.inputs.icon_base64 }}
+          VERSION_CODE: ${{ github.event.inputs.version_code }}
+          VERSION_NAME: ${{ github.event.inputs.version_name }}
         run: |
-          APP_NAME="${{ github.event.inputs.app_name }}"
-          PACKAGE_NAME="${{ github.event.inputs.package_name }}"
-          WEBSITE_URL="${{ github.event.inputs.website_url }}"
-          VERSION_CODE="${{ github.event.inputs.version_code }}"
-          VERSION_NAME="${{ github.event.inputs.version_name }}"
+          set -e
 
           PACKAGE_PATH=$(echo "$PACKAGE_NAME" | tr '.' '/')
 
           mkdir -p app/src/main/java/$PACKAGE_PATH
           mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/assets
 
           cat > settings.gradle <<'EOF'
           pluginManagement {
@@ -78,7 +97,7 @@ jobs:
               }
           }
 
-          rootProject.name = 'AddTalalGeneratedApp'
+          rootProject.name = 'AddTalalUniversalApp'
           include ':app'
           EOF
 
@@ -107,18 +126,26 @@ jobs:
           }
           EOF
 
-          python3 - <<PY
-          import html
-          app_name = """$APP_NAME"""
+          python3 - <<'PY'
+          import os, base64, html, re, json
+
+          app_name = os.environ.get("APP_NAME", "AddTalal App")
+          package_name = os.environ.get("PACKAGE_NAME", "com.addtalal.app")
+          build_mode = (os.environ.get("BUILD_MODE", "url") or "url").lower().strip()
+          website_url = os.environ.get("WEBSITE_URL", "https://example.com")
+          html_base64 = os.environ.get("HTML_BASE64", "")
+          icon_base64 = os.environ.get("ICON_BASE64", "")
+
+          # strings.xml
           with open("app/src/main/res/values/strings.xml", "w", encoding="utf-8") as f:
               f.write('<?xml version="1.0" encoding="utf-8"?>\n')
               f.write('<resources>\n')
               f.write('    <string name="app_name">' + html.escape(app_name) + '</string>\n')
               f.write('</resources>\n')
-          PY
 
-          cat > app/src/main/res/values/styles.xml <<'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
+          # styles.xml
+          with open("app/src/main/res/values/styles.xml", "w", encoding="utf-8") as f:
+              f.write('''<?xml version="1.0" encoding="utf-8"?>
           <resources>
               <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
                   <item name="android:windowNoTitle">true</item>
@@ -128,10 +155,77 @@ jobs:
                   <item name="android:navigationBarColor">#0b1220</item>
               </style>
           </resources>
-          EOF
+          ''')
 
-          cat > app/src/main/AndroidManifest.xml <<'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
+          # HTML mode: put user code inside APK assets
+          start_url = website_url
+          if build_mode == "html":
+              raw = html_base64.strip()
+              if "," in raw:
+                  raw = raw.split(",", 1)[1]
+              if raw:
+                  try:
+                      missing = len(raw) % 4
+                      if missing:
+                          raw += "=" * (4 - missing)
+                      html_bytes = base64.b64decode(raw)
+                      with open("app/src/main/assets/index.html", "wb") as f:
+                          f.write(html_bytes)
+                  except Exception:
+                      with open("app/src/main/assets/index.html", "w", encoding="utf-8") as f:
+                          f.write("<!doctype html><html><body><h1>HTML decode error</h1></body></html>")
+              else:
+                  with open("app/src/main/assets/index.html", "w", encoding="utf-8") as f:
+                      f.write("<!doctype html><html><body><h1>AddTalal App</h1></body></html>")
+              start_url = "file:///android_asset/index.html"
+
+          # App icon: uploaded icon or default vector
+          icon_written = False
+          icon_data = icon_base64.strip()
+          if icon_data:
+              try:
+                  ext = "png"
+                  if icon_data.startswith("data:image/jpeg") or icon_data.startswith("data:image/jpg"):
+                      ext = "jpg"
+                  elif icon_data.startswith("data:image/webp"):
+                      ext = "webp"
+                  elif icon_data.startswith("data:image/png"):
+                      ext = "png"
+
+                  raw_icon = icon_data.split(",", 1)[1] if "," in icon_data else icon_data
+                  missing = len(raw_icon) % 4
+                  if missing:
+                      raw_icon += "=" * (4 - missing)
+
+                  with open(f"app/src/main/res/drawable/ic_launcher.{ext}", "wb") as f:
+                      f.write(base64.b64decode(raw_icon))
+                  icon_written = True
+              except Exception:
+                  icon_written = False
+
+          if not icon_written:
+              with open("app/src/main/res/drawable/ic_launcher.xml", "w", encoding="utf-8") as f:
+                  f.write('''<?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path
+                  android:fillColor="#111827"
+                  android:pathData="M18,8h72a18,18 0,0 1,18 18v56a18,18 0,0 1,-18 18H18A18,18 0,0 1,0 82V26A18,18 0,0 1,18 8z"/>
+              <path
+                  android:fillColor="#7C3AED"
+                  android:pathData="M54,20L84,88H70L64,74H44L38,88H24L54,20zM49,62h10L54,48z"/>
+              <path
+                  android:fillColor="#22C55E"
+                  android:pathData="M76,16h8v10h10v8H84v10h-8V34H66v-8h10z"/>
+          </vector>
+          ''')
+
+          # Manifest
+          with open("app/src/main/AndroidManifest.xml", "w", encoding="utf-8") as f:
+              f.write(f'''<?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
 
@@ -139,6 +233,8 @@ jobs:
                   android:allowBackup="true"
                   android:usesCleartextTraffic="true"
                   android:label="@string/app_name"
+                  android:icon="@drawable/ic_launcher"
+                  android:roundIcon="@drawable/ic_launcher"
                   android:theme="@style/AppTheme">
 
                   <activity
@@ -151,10 +247,15 @@ jobs:
                   </activity>
               </application>
           </manifest>
-          EOF
+          ''')
 
-          cat > app/src/main/java/$PACKAGE_PATH/MainActivity.java <<EOF
-          package $PACKAGE_NAME;
+          # MainActivity.java
+          package_path = package_name.replace(".", "/")
+          java_path = f"app/src/main/java/{package_path}/MainActivity.java"
+          start_url_java = json.dumps(start_url)
+
+          with open(java_path, "w", encoding="utf-8") as f:
+              f.write(f'''package {package_name};
 
           import android.app.Activity;
           import android.os.Bundle;
@@ -164,11 +265,12 @@ jobs:
           import android.view.Window;
           import android.view.WindowManager;
 
-          public class MainActivity extends Activity {
+          public class MainActivity extends Activity {{
               private WebView webView;
+              private static final String START_URL = {start_url_java};
 
               @Override
-              protected void onCreate(Bundle savedInstanceState) {
+              protected void onCreate(Bundle savedInstanceState) {{
                   super.onCreate(savedInstanceState);
 
                   requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -184,21 +286,23 @@ jobs:
                   settings.setUseWideViewPort(true);
                   settings.setAllowFileAccess(true);
                   settings.setAllowContentAccess(true);
+                  settings.setDatabaseEnabled(true);
 
                   webView.setWebViewClient(new WebViewClient());
-                  webView.loadUrl("$WEBSITE_URL");
-              }
+                  webView.loadUrl(START_URL);
+              }}
 
               @Override
-              public void onBackPressed() {
-                  if (webView != null && webView.canGoBack()) {
+              public void onBackPressed() {{
+                  if (webView != null && webView.canGoBack()) {{
                       webView.goBack();
-                  } else {
+                  }} else {{
                       super.onBackPressed();
-                  }
-              }
-          }
-          EOF
+                  }}
+              }}
+          }}
+          ''')
+          PY
 
       - name: Build APK
         run: |
