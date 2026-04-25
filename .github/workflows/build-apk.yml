@@ -59,6 +59,8 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.10.2
 
       - name: Install image tools
         run: |
@@ -232,7 +234,13 @@ jobs:
               if icon_base64.strip():
                   raw_icon = safe_b64_decode(icon_base64)
                   img = Image.open(BytesIO(raw_icon)).convert("RGBA")
-                  img = ImageOps.fit(img, (512, 512), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+
+                  if hasattr(Image, "Resampling"):
+                      resample = Image.Resampling.LANCZOS
+                  else:
+                      resample = Image.LANCZOS
+
+                  img = ImageOps.fit(img, (512, 512), method=resample, centering=(0.5, 0.5))
 
                   sizes = {
                       "mipmap-mdpi": 48,
@@ -243,7 +251,7 @@ jobs:
                   }
 
                   for folder, size in sizes.items():
-                      out = img.resize((size, size), Image.Resampling.LANCZOS)
+                      out = img.resize((size, size), resample)
                       out.save(f"app/src/main/res/{folder}/ic_launcher.png", "PNG", optimize=True)
 
                   icon_done = True
@@ -353,26 +361,35 @@ jobs:
           ''')
           PY
 
-      - name: Build signed release APK
+      - name: Build signed release APK and AAB
         run: |
-          gradle :app:assembleRelease --no-daemon
+          gradle :app:assembleRelease :app:bundleRelease --no-daemon
 
-      - name: Rename APK
+      - name: Rename APK and AAB
         run: |
           mkdir -p output
           cp app/build/outputs/apk/release/app-release.apk output/AddTalal-App-${{ github.run_number }}.apk
+          cp app/build/outputs/bundle/release/app-release.aab output/AddTalal-App-${{ github.run_number }}.aab
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AddTalal-Generated-APK
+          name: AddTalal-APK
           path: output/AddTalal-App-${{ github.run_number }}.apk
 
-      - name: Create direct APK release
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AddTalal-Google-Play-AAB
+          path: output/AddTalal-App-${{ github.run_number }}.aab
+
+      - name: Create direct APK and AAB release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: AddTalal APK Build #${{ github.run_number }}
-          files: output/AddTalal-App-${{ github.run_number }}.apk
+          name: AddTalal APK + AAB Build #${{ github.run_number }}
+          files: |
+            output/AddTalal-App-${{ github.run_number }}.apk
+            output/AddTalal-App-${{ github.run_number }}.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
