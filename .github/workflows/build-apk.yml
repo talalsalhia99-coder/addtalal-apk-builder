@@ -60,7 +60,12 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Create universal Android WebView project
+      - name: Install image tools
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pillow
+
+      - name: Create Android WebView project
         env:
           APP_NAME: ${{ github.event.inputs.app_name }}
           PACKAGE_NAME: ${{ github.event.inputs.package_name }}
@@ -68,16 +73,26 @@ jobs:
           WEBSITE_URL: ${{ github.event.inputs.website_url }}
           HTML_BASE64: ${{ github.event.inputs.html_base64 }}
           ICON_BASE64: ${{ github.event.inputs.icon_base64 }}
-          VERSION_CODE: ${{ github.event.inputs.version_code }}
+          VERSION_CODE_INPUT: ${{ github.event.inputs.version_code }}
           VERSION_NAME: ${{ github.event.inputs.version_name }}
         run: |
           set -e
 
           PACKAGE_PATH=$(echo "$PACKAGE_NAME" | tr '.' '/')
 
+          VERSION_CODE=$(echo "$VERSION_CODE_INPUT" | tr -cd '0-9')
+          if [ -z "$VERSION_CODE" ]; then
+            VERSION_CODE="${GITHUB_RUN_NUMBER}"
+          fi
+
           mkdir -p app/src/main/java/$PACKAGE_PATH
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/mipmap-mdpi
+          mkdir -p app/src/main/res/mipmap-hdpi
+          mkdir -p app/src/main/res/mipmap-xhdpi
+          mkdir -p app/src/main/res/mipmap-xxhdpi
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
           mkdir -p app/src/main/assets
 
           cat > settings.gradle <<'EOF'
@@ -97,7 +112,7 @@ jobs:
               }
           }
 
-          rootProject.name = 'AddTalalUniversalApp'
+          rootProject.name = 'AddTalalGeneratedApp'
           include ':app'
           EOF
 
@@ -106,6 +121,18 @@ jobs:
               id 'com.android.application' version '8.6.1' apply false
           }
           EOF
+
+          keytool -genkeypair \
+            -v \
+            -keystore addtalal-release-key.jks \
+            -storepass addtalal2026 \
+            -keypass addtalal2026 \
+            -alias addtalal \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=AddTalal, OU=Builder, O=AddTalal, L=Baghdad, ST=Baghdad, C=IQ" \
+            -storetype JKS
 
           cat > app/build.gradle <<EOF
           plugins {
@@ -123,11 +150,31 @@ jobs:
                   versionCode $VERSION_CODE
                   versionName '$VERSION_NAME'
               }
+
+              signingConfigs {
+                  release {
+                      storeFile file('../addtalal-release-key.jks')
+                      storePassword 'addtalal2026'
+                      keyAlias 'addtalal'
+                      keyPassword 'addtalal2026'
+                  }
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                      minifyEnabled false
+                      shrinkResources false
+                      debuggable false
+                  }
+              }
           }
           EOF
 
           python3 - <<'PY'
-          import os, base64, html, re, json
+          import os, base64, html, json, re
+          from io import BytesIO
+          from PIL import Image, ImageOps
 
           app_name = os.environ.get("APP_NAME", "AddTalal App")
           package_name = os.environ.get("PACKAGE_NAME", "com.addtalal.app")
@@ -136,14 +183,22 @@ jobs:
           html_base64 = os.environ.get("HTML_BASE64", "")
           icon_base64 = os.environ.get("ICON_BASE64", "")
 
-          # strings.xml
+          def safe_b64_decode(value):
+              value = (value or "").strip()
+              if "," in value:
+                  value = value.split(",", 1)[1]
+              value = re.sub(r"\s+", "", value)
+              missing = len(value) % 4
+              if missing:
+                  value += "=" * (4 - missing)
+              return base64.b64decode(value)
+
           with open("app/src/main/res/values/strings.xml", "w", encoding="utf-8") as f:
               f.write('<?xml version="1.0" encoding="utf-8"?>\n')
               f.write('<resources>\n')
               f.write('    <string name="app_name">' + html.escape(app_name) + '</string>\n')
               f.write('</resources>\n')
 
-          # styles.xml
           with open("app/src/main/res/values/styles.xml", "w", encoding="utf-8") as f:
               f.write('''<?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -157,53 +212,46 @@ jobs:
           </resources>
           ''')
 
-          # HTML mode: put user code inside APK assets
           start_url = website_url
+
           if build_mode == "html":
-              raw = html_base64.strip()
-              if "," in raw:
-                  raw = raw.split(",", 1)[1]
-              if raw:
-                  try:
-                      missing = len(raw) % 4
-                      if missing:
-                          raw += "=" * (4 - missing)
-                      html_bytes = base64.b64decode(raw)
-                      with open("app/src/main/assets/index.html", "wb") as f:
-                          f.write(html_bytes)
-                  except Exception:
-                      with open("app/src/main/assets/index.html", "w", encoding="utf-8") as f:
-                          f.write("<!doctype html><html><body><h1>HTML decode error</h1></body></html>")
-              else:
+              try:
+                  html_bytes = safe_b64_decode(html_base64) if html_base64.strip() else b""
+                  if not html_bytes:
+                      html_bytes = b"<!doctype html><html><body><h1>AddTalal App</h1></body></html>"
+                  with open("app/src/main/assets/index.html", "wb") as f:
+                      f.write(html_bytes)
+              except Exception:
                   with open("app/src/main/assets/index.html", "w", encoding="utf-8") as f:
-                      f.write("<!doctype html><html><body><h1>AddTalal App</h1></body></html>")
+                      f.write("<!doctype html><html><body><h1>HTML decode error</h1></body></html>")
               start_url = "file:///android_asset/index.html"
 
-          # App icon: uploaded icon or default vector
-          icon_written = False
-          icon_data = icon_base64.strip()
-          if icon_data:
-              try:
-                  ext = "png"
-                  if icon_data.startswith("data:image/jpeg") or icon_data.startswith("data:image/jpg"):
-                      ext = "jpg"
-                  elif icon_data.startswith("data:image/webp"):
-                      ext = "webp"
-                  elif icon_data.startswith("data:image/png"):
-                      ext = "png"
+          icon_done = False
 
-                  raw_icon = icon_data.split(",", 1)[1] if "," in icon_data else icon_data
-                  missing = len(raw_icon) % 4
-                  if missing:
-                      raw_icon += "=" * (4 - missing)
+          try:
+              if icon_base64.strip():
+                  raw_icon = safe_b64_decode(icon_base64)
+                  img = Image.open(BytesIO(raw_icon)).convert("RGBA")
+                  img = ImageOps.fit(img, (512, 512), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
 
-                  with open(f"app/src/main/res/drawable/ic_launcher.{ext}", "wb") as f:
-                      f.write(base64.b64decode(raw_icon))
-                  icon_written = True
-              except Exception:
-                  icon_written = False
+                  sizes = {
+                      "mipmap-mdpi": 48,
+                      "mipmap-hdpi": 72,
+                      "mipmap-xhdpi": 96,
+                      "mipmap-xxhdpi": 144,
+                      "mipmap-xxxhdpi": 192,
+                  }
 
-          if not icon_written:
+                  for folder, size in sizes.items():
+                      out = img.resize((size, size), Image.Resampling.LANCZOS)
+                      out.save(f"app/src/main/res/{folder}/ic_launcher.png", "PNG", optimize=True)
+
+                  icon_done = True
+          except Exception as e:
+              print("Icon processing failed, using default icon:", e)
+              icon_done = False
+
+          if not icon_done:
               with open("app/src/main/res/drawable/ic_launcher.xml", "w", encoding="utf-8") as f:
                   f.write('''<?xml version="1.0" encoding="utf-8"?>
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -223,7 +271,8 @@ jobs:
           </vector>
           ''')
 
-          # Manifest
+          icon_ref = "@mipmap/ic_launcher" if icon_done else "@drawable/ic_launcher"
+
           with open("app/src/main/AndroidManifest.xml", "w", encoding="utf-8") as f:
               f.write(f'''<?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -233,8 +282,8 @@ jobs:
                   android:allowBackup="true"
                   android:usesCleartextTraffic="true"
                   android:label="@string/app_name"
-                  android:icon="@drawable/ic_launcher"
-                  android:roundIcon="@drawable/ic_launcher"
+                  android:icon="{icon_ref}"
+                  android:roundIcon="{icon_ref}"
                   android:theme="@style/AppTheme">
 
                   <activity
@@ -249,7 +298,6 @@ jobs:
           </manifest>
           ''')
 
-          # MainActivity.java
           package_path = package_name.replace(".", "/")
           java_path = f"app/src/main/java/{package_path}/MainActivity.java"
           start_url_java = json.dumps(start_url)
@@ -287,6 +335,7 @@ jobs:
                   settings.setAllowFileAccess(true);
                   settings.setAllowContentAccess(true);
                   settings.setDatabaseEnabled(true);
+                  settings.setMediaPlaybackRequiresUserGesture(false);
 
                   webView.setWebViewClient(new WebViewClient());
                   webView.loadUrl(START_URL);
@@ -304,14 +353,14 @@ jobs:
           ''')
           PY
 
-      - name: Build APK
+      - name: Build signed release APK
         run: |
-          gradle :app:assembleDebug --no-daemon
+          gradle :app:assembleRelease --no-daemon
 
       - name: Rename APK
         run: |
           mkdir -p output
-          cp app/build/outputs/apk/debug/app-debug.apk output/AddTalal-App-${{ github.run_number }}.apk
+          cp app/build/outputs/apk/release/app-release.apk output/AddTalal-App-${{ github.run_number }}.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
