@@ -1,493 +1,548 @@
-<!doctype html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>تطبيق كاميرا ومايك</title>
-
-<style>
-*{
-  box-sizing:border-box;
-}
-
-body{
-  margin:0;
-  font-family:Tahoma,Arial,sans-serif;
-  background:linear-gradient(180deg,#07111f,#111827);
-  color:#fff;
-  min-height:100vh;
-}
-
-.app{
-  max-width:520px;
-  margin:0 auto;
-  padding:18px;
-}
-
-.header{
-  text-align:center;
-  padding:18px 8px 12px;
-}
-
-.logo{
-  width:82px;
-  height:82px;
-  margin:0 auto 14px;
-  border-radius:24px;
-  background:linear-gradient(135deg,#7c3aed,#2563eb,#22c55e);
-  display:grid;
-  place-items:center;
-  font-size:34px;
-  font-weight:900;
-  box-shadow:0 18px 45px rgba(0,0,0,.35);
-}
-
-h1{
-  margin:0;
-  font-size:27px;
-  line-height:1.4;
-}
-
-.header p{
-  margin:10px 0 0;
-  color:#cbd5e1;
-  font-size:15px;
-  line-height:1.8;
-}
-
-.card{
-  background:#111827;
-  border:1px solid #263247;
-  border-radius:24px;
-  padding:14px;
-  margin-top:14px;
-  box-shadow:0 18px 45px rgba(0,0,0,.32);
-}
-
-.videoBox{
-  background:#020617;
-  border-radius:20px;
-  overflow:hidden;
-  border:1px solid #334155;
-}
-
-video{
-  width:100%;
-  height:360px;
-  object-fit:cover;
-  display:block;
-  background:#020617;
-}
-
-.controls{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-top:14px;
-}
-
-button,label.fileBtn{
-  border:0;
-  outline:0;
-  padding:15px 10px;
-  border-radius:16px;
-  font-size:15px;
-  font-weight:900;
-  color:white;
-  text-align:center;
-  cursor:pointer;
-  background:#334155;
-}
-
-.primary{
-  background:linear-gradient(135deg,#7c3aed,#2563eb);
-}
-
-.green{
-  background:linear-gradient(135deg,#16a34a,#22c55e);
-}
-
-.red{
-  background:linear-gradient(135deg,#ef4444,#b91c1c);
-}
-
-.orange{
-  background:linear-gradient(135deg,#f59e0b,#ea580c);
-}
-
-.dark{
-  background:#0f172a;
-}
-
-.full{
-  grid-column:1/-1;
-}
-
-.status{
-  margin-top:14px;
-  padding:13px;
-  border-radius:16px;
-  background:#0b1220;
-  border:1px solid #263247;
-  color:#dbeafe;
-  line-height:1.8;
-  font-size:14px;
-  min-height:48px;
-}
-
-.preview{
-  margin-top:14px;
-}
-
-img,audio{
-  width:100%;
-  margin-top:10px;
-  border-radius:16px;
-}
-
-img{
-  border:1px solid #334155;
-  background:#020617;
-}
-
-a.download{
-  display:block;
-  text-align:center;
-  text-decoration:none;
-  margin-top:10px;
-  padding:14px;
-  border-radius:16px;
-  background:linear-gradient(135deg,#16a34a,#22c55e);
-  color:white;
-  font-weight:900;
-}
-
-input[type="file"]{
-  display:none;
-}
-
-.info{
-  color:#94a3b8;
-  font-size:12px;
-  line-height:1.8;
-  margin-top:12px;
-}
-
-.locationBox{
-  margin-top:10px;
-  padding:12px;
-  border-radius:16px;
-  background:#020617;
-  border:1px solid #263247;
-  color:#cbd5e1;
-  line-height:1.7;
-  font-size:13px;
-  display:none;
-}
-
-@media(max-width:420px){
-  video{
-    height:310px;
-  }
-
-  h1{
-    font-size:23px;
-  }
-
-  button,label.fileBtn{
-    font-size:14px;
-    padding:13px 8px;
-  }
-}
-</style>
-</head>
-
-<body>
-
-<div class="app">
-
-  <div class="header">
-    <div class="logo">AT</div>
-    <h1>تطبيق الكاميرا والمايك</h1>
-    <p>افتح الكاميرا، التقط صورة، سجّل صوت، اختر ملف، واعرض الموقع الجغرافي.</p>
-  </div>
-
-  <div class="card">
-    <div class="videoBox">
-      <video id="video" autoplay playsinline muted></video>
-    </div>
-
-    <div class="controls">
-      <button class="primary" onclick="startCamera()">فتح الكاميرا</button>
-      <button class="orange" onclick="switchCamera()">تبديل الكاميرا</button>
-
-      <button class="green" onclick="takePhoto()">التقاط صورة</button>
-      <button class="red" onclick="stopCamera()">إيقاف الكاميرا</button>
-
-      <button class="primary full" id="recordBtn" onclick="toggleRecording()">بدء تسجيل الصوت</button>
-
-      <label class="fileBtn dark full">
-        اختيار صورة / فيديو / ملف
-        <input id="fileInput" type="file" accept="image/*,video/*,audio/*,.pdf,.txt" onchange="handleFile(event)">
-      </label>
-
-      <button class="orange full" onclick="getLocation()">عرض موقعي الجغرافي</button>
-    </div>
-
-    <div class="status" id="status">
-      اضغط فتح الكاميرا، ثم وافق على الصلاحيات من الهاتف.
-    </div>
-
-    <div class="locationBox" id="locationBox"></div>
-
-    <div class="preview">
-      <canvas id="canvas" style="display:none"></canvas>
-
-      <img id="photo" alt="الصورة الملتقطة" style="display:none">
-      <a id="photoDownload" class="download" style="display:none" download="photo.png">تحميل الصورة</a>
-
-      <audio id="audio" controls style="display:none"></audio>
-      <a id="audioDownload" class="download" style="display:none" download="recording.webm">تحميل التسجيل الصوتي</a>
-
-      <div id="filePreview"></div>
-    </div>
-
-    <div class="info">
-      ملاحظة: إذا طلب الهاتف صلاحيات الكاميرا أو المايك، اختر سماح. إذا كانت نسخة قديمة من التطبيق مثبتة، احذفها وثبّت النسخة الجديدة.
-    </div>
-  </div>
-
-</div>
-
-<script>
-let stream = null;
-let facingMode = "environment";
-let recorder = null;
-let audioChunks = [];
-let recording = false;
-
-const video = document.getElementById("video");
-const statusBox = document.getElementById("status");
-
-function setStatus(text){
-  statusBox.textContent = text;
-}
-
-function hasMedia(){
-  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-}
-
-async function startCamera(){
-  try{
-    if(!hasMedia()){
-      setStatus("هذا الجهاز أو هذا المتصفح لا يدعم تشغيل الكاميرا مباشرة.");
-      return;
-    }
-
-    stopCamera();
-
-    stream = await navigator.mediaDevices.getUserMedia({
-      video:{
-        facingMode:facingMode,
-        width:{ ideal:1280 },
-        height:{ ideal:720 }
-      },
-      audio:true
-    });
-
-    video.srcObject = stream;
-    await video.play();
-
-    setStatus("تم تشغيل الكاميرا والمايك بنجاح.");
-  }catch(error){
-    setStatus("تعذر تشغيل الكاميرا أو المايك: " + error.message);
-  }
-}
-
-function stopCamera(){
-  if(stream){
-    stream.getTracks().forEach(track => track.stop());
-    stream = null;
-  }
-
-  video.srcObject = null;
-}
-
-async function switchCamera(){
-  facingMode = facingMode === "environment" ? "user" : "environment";
-  await startCamera();
-}
-
-function takePhoto(){
-  if(!stream){
-    setStatus("افتح الكاميرا أولًا قبل التقاط الصورة.");
-    return;
-  }
-
-  const canvas = document.getElementById("canvas");
-  const photo = document.getElementById("photo");
-  const link = document.getElementById("photoDownload");
-
-  const width = video.videoWidth || 720;
-  const height = video.videoHeight || 1280;
-
-  canvas.width = width;
-  canvas.height = height;
-
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(video,0,0,width,height);
-
-  const dataUrl = canvas.toDataURL("image/png");
-
-  photo.src = dataUrl;
-  photo.style.display = "block";
-
-  link.href = dataUrl;
-  link.style.display = "block";
-
-  setStatus("تم التقاط الصورة بنجاح.");
-}
-
-async function toggleRecording(){
-  if(recording){
-    stopRecording();
-  }else{
-    await startRecording();
-  }
-}
-
-async function startRecording(){
-  try{
-    if(!hasMedia()){
-      setStatus("هذا الجهاز لا يدعم تسجيل الصوت من المتصفح.");
-      return;
-    }
-
-    if(!stream){
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio:true,
-        video:false
-      });
-    }
-
-    audioChunks = [];
-
-    recorder = new MediaRecorder(stream);
-
-    recorder.ondataavailable = function(event){
-      if(event.data && event.data.size > 0){
-        audioChunks.push(event.data);
-      }
-    };
-
-    recorder.onstop = function(){
-      const blob = new Blob(audioChunks,{ type:"audio/webm" });
-      const url = URL.createObjectURL(blob);
-
-      const audio = document.getElementById("audio");
-      const link = document.getElementById("audioDownload");
-
-      audio.src = url;
-      audio.style.display = "block";
-
-      link.href = url;
-      link.style.display = "block";
-
-      setStatus("تم حفظ التسجيل الصوتي. يمكنك تشغيله أو تحميله.");
-    };
-
-    recorder.start();
-
-    recording = true;
-    document.getElementById("recordBtn").textContent = "إيقاف تسجيل الصوت";
-    setStatus("جاري تسجيل الصوت...");
-  }catch(error){
-    setStatus("تعذر تشغيل تسجيل الصوت: " + error.message);
-  }
-}
-
-function stopRecording(){
-  if(recorder && recording){
-    recorder.stop();
-    recording = false;
-    document.getElementById("recordBtn").textContent = "بدء تسجيل الصوت";
-  }
-}
-
-function handleFile(event){
-  const file = event.target.files[0];
-  const box = document.getElementById("filePreview");
-
-  if(!file){
-    return;
-  }
-
-  const url = URL.createObjectURL(file);
-  box.innerHTML = "";
-
-  if(file.type.startsWith("image/")){
-    const img = document.createElement("img");
-    img.src = url;
-    box.appendChild(img);
-  }else if(file.type.startsWith("video/")){
-    const vid = document.createElement("video");
-    vid.src = url;
-    vid.controls = true;
-    vid.style.marginTop = "10px";
-    vid.style.borderRadius = "16px";
-    box.appendChild(vid);
-  }else if(file.type.startsWith("audio/")){
-    const aud = document.createElement("audio");
-    aud.src = url;
-    aud.controls = true;
-    aud.style.display = "block";
-    box.appendChild(aud);
-  }else{
-    const div = document.createElement("div");
-    div.className = "status";
-    div.textContent = "تم اختيار الملف: " + file.name;
-    box.appendChild(div);
-  }
-
-  setStatus("تم اختيار ملف: " + file.name);
-}
-
-function getLocation(){
-  const locationBox = document.getElementById("locationBox");
-
-  if(!navigator.geolocation){
-    setStatus("الموقع الجغرافي غير مدعوم في هذا الجهاز.");
-    return;
-  }
-
-  setStatus("جاري جلب الموقع الجغرافي...");
-
-  navigator.geolocation.getCurrentPosition(
-    function(pos){
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const acc = pos.coords.accuracy;
-
-      locationBox.style.display = "block";
-      locationBox.innerHTML =
-        "خط العرض: " + lat + "<br>" +
-        "خط الطول: " + lng + "<br>" +
-        "الدقة التقريبية: " + Math.round(acc) + " متر<br><br>" +
-        '<a class="download" target="_blank" href="https://maps.google.com/?q=' + lat + ',' + lng + '">فتح في خرائط Google</a>';
-
-      setStatus("تم جلب الموقع الجغرافي بنجاح.");
-    },
-    function(error){
-      setStatus("تعذر جلب الموقع: " + error.message);
-    },
-    {
-      enableHighAccuracy:true,
-      timeout:15000,
-      maximumAge:0
-    }
-  );
-}
-</script>
-
-</body>
-</html>
+name: Build AddTalal APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: "App name"
+        required: true
+        default: "AddTalal App"
+      package_name:
+        description: "Android package name"
+        required: true
+        default: "com.addtalal.app"
+      build_mode:
+        description: "Build mode: url or html"
+        required: true
+        default: "url"
+      website_url:
+        description: "Website URL for URL mode"
+        required: false
+        default: "https://throbbing-sun-13b2.talalsalhia10.workers.dev"
+      html_base64:
+        description: "Base64 HTML code for HTML mode"
+        required: false
+        default: ""
+      icon_base64:
+        description: "Base64 app icon data URL"
+        required: false
+        default: ""
+      version_code:
+        description: "Version code"
+        required: true
+        default: "1"
+      version_name:
+        description: "Version name"
+        required: true
+        default: "1.0"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.10.2
+
+      - name: Install image tools
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pillow
+
+      - name: Create Android WebView project
+        env:
+          APP_NAME: ${{ github.event.inputs.app_name }}
+          PACKAGE_NAME: ${{ github.event.inputs.package_name }}
+          BUILD_MODE: ${{ github.event.inputs.build_mode }}
+          WEBSITE_URL: ${{ github.event.inputs.website_url }}
+          HTML_BASE64: ${{ github.event.inputs.html_base64 }}
+          ICON_BASE64: ${{ github.event.inputs.icon_base64 }}
+          VERSION_CODE_INPUT: ${{ github.event.inputs.version_code }}
+          VERSION_NAME: ${{ github.event.inputs.version_name }}
+        run: |
+          set -e
+
+          PACKAGE_PATH=$(echo "$PACKAGE_NAME" | tr '.' '/')
+
+          VERSION_CODE=$(echo "$VERSION_CODE_INPUT" | tr -cd '0-9')
+          if [ -z "$VERSION_CODE" ]; then
+            VERSION_CODE="${GITHUB_RUN_NUMBER}"
+          fi
+
+          mkdir -p app/src/main/java/$PACKAGE_PATH
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/mipmap-mdpi
+          mkdir -p app/src/main/res/mipmap-hdpi
+          mkdir -p app/src/main/res/mipmap-xhdpi
+          mkdir -p app/src/main/res/mipmap-xxhdpi
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
+          mkdir -p app/src/main/assets
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.name = 'AddTalalGeneratedApp'
+          include ':app'
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.6.1' apply false
+          }
+          EOF
+
+          keytool -genkeypair \
+            -v \
+            -keystore addtalal-release-key.jks \
+            -storepass addtalal2026 \
+            -keypass addtalal2026 \
+            -alias addtalal \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=AddTalal, OU=Builder, O=AddTalal, L=Baghdad, ST=Baghdad, C=IQ" \
+            -storetype JKS
+
+          cat > app/build.gradle <<EOF
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace '$PACKAGE_NAME'
+              compileSdk 35
+
+              defaultConfig {
+                  applicationId '$PACKAGE_NAME'
+                  minSdk 23
+                  targetSdk 35
+                  versionCode $VERSION_CODE
+                  versionName '$VERSION_NAME'
+              }
+
+              signingConfigs {
+                  release {
+                      storeFile file('../addtalal-release-key.jks')
+                      storePassword 'addtalal2026'
+                      keyAlias 'addtalal'
+                      keyPassword 'addtalal2026'
+                  }
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                      minifyEnabled false
+                      shrinkResources false
+                      debuggable false
+                  }
+              }
+          }
+          EOF
+
+          python3 - <<'PY'
+          import os, base64, html, json, re
+          from io import BytesIO
+          from PIL import Image, ImageOps
+
+          app_name = os.environ.get("APP_NAME", "AddTalal App")
+          package_name = os.environ.get("PACKAGE_NAME", "com.addtalal.app")
+          build_mode = (os.environ.get("BUILD_MODE", "url") or "url").lower().strip()
+          website_url = os.environ.get("WEBSITE_URL", "https://example.com")
+          html_base64 = os.environ.get("HTML_BASE64", "")
+          icon_base64 = os.environ.get("ICON_BASE64", "")
+
+          def safe_b64_decode(value):
+              value = (value or "").strip()
+              if "," in value:
+                  value = value.split(",", 1)[1]
+              value = re.sub(r"\s+", "", value)
+              missing = len(value) % 4
+              if missing:
+                  value += "=" * (4 - missing)
+              return base64.b64decode(value)
+
+          with open("app/src/main/res/values/strings.xml", "w", encoding="utf-8") as f:
+              f.write('<?xml version="1.0" encoding="utf-8"?>\n')
+              f.write('<resources>\n')
+              f.write('    <string name="app_name">' + html.escape(app_name) + '</string>\n')
+              f.write('</resources>\n')
+
+          with open("app/src/main/res/values/styles.xml", "w", encoding="utf-8") as f:
+              f.write('''<?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:windowNoTitle">true</item>
+                  <item name="android:windowActionBar">false</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:statusBarColor">#0b1220</item>
+                  <item name="android:navigationBarColor">#0b1220</item>
+              </style>
+          </resources>
+          ''')
+
+          start_url = website_url
+
+          if build_mode == "html":
+              try:
+                  html_bytes = safe_b64_decode(html_base64) if html_base64.strip() else b""
+                  if not html_bytes:
+                      html_bytes = b"<!doctype html><html><body><h1>AddTalal App</h1></body></html>"
+                  with open("app/src/main/assets/index.html", "wb") as f:
+                      f.write(html_bytes)
+              except Exception:
+                  with open("app/src/main/assets/index.html", "w", encoding="utf-8") as f:
+                      f.write("<!doctype html><html><body><h1>HTML decode error</h1></body></html>")
+              start_url = "file:///android_asset/index.html"
+
+          icon_done = False
+
+          try:
+              if icon_base64.strip():
+                  raw_icon = safe_b64_decode(icon_base64)
+                  img = Image.open(BytesIO(raw_icon)).convert("RGBA")
+
+                  if hasattr(Image, "Resampling"):
+                      resample = Image.Resampling.LANCZOS
+                  else:
+                      resample = Image.LANCZOS
+
+                  img = ImageOps.fit(img, (512, 512), method=resample, centering=(0.5, 0.5))
+
+                  sizes = {
+                      "mipmap-mdpi": 48,
+                      "mipmap-hdpi": 72,
+                      "mipmap-xhdpi": 96,
+                      "mipmap-xxhdpi": 144,
+                      "mipmap-xxxhdpi": 192,
+                  }
+
+                  for folder, size in sizes.items():
+                      out = img.resize((size, size), resample)
+                      out.save(f"app/src/main/res/{folder}/ic_launcher.png", "PNG", optimize=True)
+
+                  icon_done = True
+          except Exception as e:
+              print("Icon processing failed, using default icon:", e)
+              icon_done = False
+
+          if not icon_done:
+              with open("app/src/main/res/drawable/ic_launcher.xml", "w", encoding="utf-8") as f:
+                  f.write('''<?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path
+                  android:fillColor="#111827"
+                  android:pathData="M18,8h72a18,18 0,0 1,18 18v56a18,18 0,0 1,-18 18H18A18,18 0,0 1,0 82V26A18,18 0,0 1,18 8z"/>
+              <path
+                  android:fillColor="#7C3AED"
+                  android:pathData="M54,20L84,88H70L64,74H44L38,88H24L54,20zM49,62h10L54,48z"/>
+              <path
+                  android:fillColor="#22C55E"
+                  android:pathData="M76,16h8v10h10v8H84v10h-8V34H66v-8h10z"/>
+          </vector>
+          ''')
+
+          icon_ref = "@mipmap/ic_launcher" if icon_done else "@drawable/ic_launcher"
+
+          with open("app/src/main/AndroidManifest.xml", "w", encoding="utf-8") as f:
+              f.write(f'''<?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.RECORD_AUDIO" />
+              <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+              <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+
+              <uses-feature android:name="android.hardware.camera" android:required="false" />
+              <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+              <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
+              <application
+                  android:allowBackup="true"
+                  android:usesCleartextTraffic="true"
+                  android:hardwareAccelerated="true"
+                  android:label="@string/app_name"
+                  android:icon="{icon_ref}"
+                  android:roundIcon="{icon_ref}"
+                  android:theme="@style/AppTheme">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:hardwareAccelerated="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          ''')
+
+          package_path = package_name.replace(".", "/")
+          java_path = f"app/src/main/java/{package_path}/MainActivity.java"
+          start_url_java = json.dumps(start_url)
+
+          with open(java_path, "w", encoding="utf-8") as f:
+              f.write(f'''package {package_name};
+
+          import android.Manifest;
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.os.Build;
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.net.Uri;
+          import android.webkit.GeolocationPermissions;
+          import android.webkit.PermissionRequest;
+          import android.webkit.ValueCallback;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.view.Window;
+          import android.view.WindowManager;
+          import java.util.ArrayList;
+          import java.util.List;
+
+          public class MainActivity extends Activity {{
+              private WebView webView;
+              private ValueCallback<Uri[]> filePathCallback;
+              private static final int FILE_CHOOSER_REQUEST = 9001;
+              private static final int PERMISSION_REQUEST = 9002;
+              private static final String START_URL = {start_url_java};
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {{
+                  super.onCreate(savedInstanceState);
+
+                  requestWindowFeature(Window.FEATURE_NO_TITLE);
+                  getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+                  requestRuntimePermissions();
+
+                  webView = new WebView(this);
+                  setContentView(webView);
+
+                  WebSettings settings = webView.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setLoadWithOverviewMode(true);
+                  settings.setUseWideViewPort(true);
+                  settings.setAllowFileAccess(true);
+                  settings.setAllowContentAccess(true);
+                  settings.setDatabaseEnabled(true);
+                  settings.setMediaPlaybackRequiresUserGesture(false);
+                  settings.setJavaScriptCanOpenWindowsAutomatically(true);
+                  settings.setGeolocationEnabled(true);
+
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {{
+                      settings.setAllowFileAccessFromFileURLs(true);
+                      settings.setAllowUniversalAccessFromFileURLs(true);
+                  }}
+
+                  webView.setWebViewClient(new WebViewClient());
+
+                  webView.setWebChromeClient(new WebChromeClient() {{
+                      @Override
+                      public void onPermissionRequest(final PermissionRequest request) {{
+                          runOnUiThread(new Runnable() {{
+                              @Override
+                              public void run() {{
+                                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {{
+                                      request.grant(request.getResources());
+                                  }}
+                              }}
+                          }});
+                      }}
+
+                      @Override
+                      public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {{
+                          callback.invoke(origin, true, false);
+                      }}
+
+                      @Override
+                      public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> callback, FileChooserParams params) {{
+                          if (MainActivity.this.filePathCallback != null) {{
+                              MainActivity.this.filePathCallback.onReceiveValue(null);
+                          }}
+
+                          MainActivity.this.filePathCallback = callback;
+
+                          Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                          intent.addCategory(Intent.CATEGORY_OPENABLE);
+                          intent.setType("*/*");
+
+                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {{
+                              intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                          }}
+
+                          String[] mimeTypes = new String[]{{"image/*", "video/*", "audio/*", "application/pdf", "text/*"}};
+                          intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+
+                          startActivityForResult(Intent.createChooser(intent, "اختر ملف"), FILE_CHOOSER_REQUEST);
+                          return true;
+                      }}
+                  }});
+
+                  webView.loadUrl(START_URL);
+              }}
+
+              private void requestRuntimePermissions() {{
+                  if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+
+                  List<String> permissions = new ArrayList<>();
+
+                  if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {{
+                      permissions.add(Manifest.permission.CAMERA);
+                  }}
+
+                  if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {{
+                      permissions.add(Manifest.permission.RECORD_AUDIO);
+                  }}
+
+                  if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {{
+                      permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
+                  }}
+
+                  if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {{
+                      permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION);
+                  }}
+
+                  if (Build.VERSION.SDK_INT >= 33) {{
+                      if (checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {{
+                          permissions.add(Manifest.permission.READ_MEDIA_IMAGES);
+                      }}
+                      if (checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED) {{
+                          permissions.add(Manifest.permission.READ_MEDIA_VIDEO);
+                      }}
+                      if (checkSelfPermission(Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {{
+                          permissions.add(Manifest.permission.READ_MEDIA_AUDIO);
+                      }}
+                  }} else {{
+                      if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {{
+                          permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+                      }}
+                  }}
+
+                  if (!permissions.isEmpty()) {{
+                      requestPermissions(permissions.toArray(new String[0]), PERMISSION_REQUEST);
+                  }}
+              }}
+
+              @Override
+              protected void onActivityResult(int requestCode, int resultCode, Intent data) {{
+                  super.onActivityResult(requestCode, resultCode, data);
+
+                  if (requestCode == FILE_CHOOSER_REQUEST) {{
+                      if (filePathCallback == null) return;
+
+                      Uri[] results = null;
+
+                      if (resultCode == Activity.RESULT_OK && data != null) {{
+                          if (data.getClipData() != null) {{
+                              int count = data.getClipData().getItemCount();
+                              results = new Uri[count];
+
+                              for (int i = 0; i < count; i++) {{
+                                  results[i] = data.getClipData().getItemAt(i).getUri();
+                              }}
+                          }} else if (data.getData() != null) {{
+                              results = new Uri[]{{data.getData()}};
+                          }}
+                      }}
+
+                      filePathCallback.onReceiveValue(results);
+                      filePathCallback = null;
+                  }}
+              }}
+
+              @Override
+              public void onBackPressed() {{
+                  if (webView != null && webView.canGoBack()) {{
+                      webView.goBack();
+                  }} else {{
+                      super.onBackPressed();
+                  }}
+              }}
+          }}
+          ''')
+          PY
+
+      - name: Build signed release APK and AAB
+        run: |
+          gradle :app:assembleRelease :app:bundleRelease --no-daemon
+
+      - name: Rename APK and AAB
+        run: |
+          mkdir -p output
+          cp app/build/outputs/apk/release/app-release.apk output/AddTalal-App-${{ github.run_number }}.apk
+          cp app/build/outputs/bundle/release/app-release.aab output/AddTalal-App-${{ github.run_number }}.aab
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AddTalal-APK
+          path: output/AddTalal-App-${{ github.run_number }}.apk
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AddTalal-Google-Play-AAB
+          path: output/AddTalal-App-${{ github.run_number }}.aab
+
+      - name: Create direct APK and AAB release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: AddTalal APK + AAB Build #${{ github.run_number }}
+          files: |
+            output/AddTalal-App-${{ github.run_number }}.apk
+            output/AddTalal-App-${{ github.run_number }}.aab
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
